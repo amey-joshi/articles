@@ -133,4 +133,8 @@ dmypy.json
 *.aux
 *.log
 *.pdf
+*.docx
+*.bbl
+*.blg
+
 
