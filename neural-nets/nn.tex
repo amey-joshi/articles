@@ -233,13 +233,126 @@ shown in figure \ref{f4}.
 There are $d + 1$ inputs and $m$ outputs in the first layer. The $m$ 
 outputs are the inputs to the $m$ neurons in the second layer. The output
 of every neuron in the first layer is fed as an input to the second layer.
-Therefore there are $(d + 1) \times m$ weights, denoted by $w_{ij}$ with
+Therefore there are $(d + 1) \times m$ weights, denoted by $w_{ij}^{(1)}$ with
 $i$ ranging from $0$ to $d$ and $j$ ranging from $1$ to $m$. Using the 
 notations of equations \eqref{s3e1} and \eqref{s3e2}, we can write
 \begin{equation}\label{s3e3}
-z_j = g\left(\sum_{i=0}^d w_{ji}x_i\right).
+z_j = g_1\left(\sum_{i=0}^d w_{ji}^{(1)}x_i\right).
 \end{equation}
+The $z_j$ along with $z_0 = 1$ form the inputs to the second layer so that 
+the final output is
+\begin{equation}\label{s3e4}
+y_k = g_2\left(\sum_{j=0}^m w^{(2)}_{jk} g_1\left(\sum_{i=0}^d w^{(1)}_{ij}x_i
+\right)\right),
+\end{equation}
+The activation functions $g_1$ and $g_2$ in equations \eqref{s3e3} and 
+\eqref{s3e4} may be same or they could differ. If they are linear functions
+then the network is no different from matrix multiplication. In they are
+non-linear then the network can represent quite complicated functions. It can
+be shown that if $m$ is sufficiently large then the network of figure \ref{f4}
+can represent any continuous function defined over a finite range of its
+domain, to arbitrary accuracy \cite{bishop1994neural}. When a nulti-layer
+perceptron is used for classification it is common to have $g_2$ to be the
+softmax function so that one can interpret the outputs $y_1, \ldots, y_c$ as
+the probability of membership in classes $1, \ldots, c$.
 
+We saw several activation functions in figure \ref{f3}. We can use all of
+these except the step function. The algorithm to train multi-layer preceptron 
+requires finding the 
+derivative of the activation function. The last one, namely, $g(x)=\max(0, x)$ 
+is not differentiable at the origin. However, that is usually not a problem. 
+The hyperbolic tangent and the logistic functions are especially favored because
+their derivatives can be expressed in terms of themselves. From a numerical
+perspective, computing the derivative at a certain value is easy if we have
+computed the function at the same value. This follows from the fact that if
+$g(x) = \tanh(x)$ then $g^\prime(x) = 1 + (g(x))^2$ and if $g(x) =
+(1+e^{-x})^{-1}$ then $g^\prime(x) = g(x)(1 - g(x))$.
+
+Training the network means selecting the `best' choices of the weights 
+$w^{(1)}_{ij}$ and $w^{(2)}_{jk}$ such that the values of the output $y_k$ 
+are as close to the unknown function as possible. If we are given that an
+input $\vec{x}^q = (x_1^q, \ldots, x_d^q)$ corresponds to a value $\vec{t}^q
+= (t_1^q, \ldots, t_c^q$ (refer to figure \ref{f4}) then the error function
+for this input is
+\begin{equation}\label{s3e5}
+E = \frac{1}{2}\sum_{q=1}^n ||\vec{t}^q - \vec{y}^q||^2,
+\end{equation}
+where $\vec{y}^q = (y_1^q, \ldots, y_c^q)$ is the output of the network. The
+quantity $E$ is a function of the weights $w^{(1)}_{ij}$ and $w^{(2)}_{jk}$.
+Training the network is thus finding the minimum of the function $E$. In 
+general, $E$ can have several minima and the challenge of a network training
+algorithm is the find the least among all the minima. This choice of the
+minimum is called the \emph{global} minimum. There are several optimization
+algorithms to compute extrema of functions of several variables. In the case
+of the error function of \eqref{s3e5}, where $\vec{y}^q$ is the output of a
+multi-layer perceptron, an efficient algorithm is based on \emph{error
+backpropagation} \cite{rumelhart1985learning}. For each pair $(\vec{x}^q, 
+\vec{t}^q)$, the algorithm first computes the error $\vec{t}^q - \vec{y}^q$
+and then it attributes a portion of the error to each neuron of the previous
+layers, reaching all the way down to the input layer. It then adjusts the 
+weights starting from the input layer al the way up to the output layer to 
+minimize the error. In modern terms, it can be described as a gradient descent 
+with an auto-diff \cite{geron2019hands}.
+
+We will illustrate classification using the multi-layer perceptron in the
+code snippets below. The first among these imports the necessary packages.
+\begin{verbatim}
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn import datasets
+from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
+from sklearn import preprocessing
+from sklearn.metrics import average_precision_score, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import plot_confusion_matrix
+\end{verbatim}
+
+We then load the data set and encode the class as a number.
+\begin{verbatim}
+df = sns.load_dataset("iris")
+encoder = preprocessing.LabelEncoder()
+df['species_class'] = encoder.fit_transform(df['species'])
+\end{verbatim}
+
+After splitting the data set as
+\begin{verbatim}
+X_train, X_test, y_train, y_test = 
+	train_test_split(df[['petal_length', 'petal_width']], \
+                     df['species_class'], \
+                     test_size=1/3, \
+                     random_state = 15081947)
+\end{verbatim}
+we train a multi-layer perceptron classifier 
+\begin{verbatim}
+clf_0 = MLPClassifier(hidden_layer_sizes=(3, 3), \
+                     random_state=15081947, \
+                     solver='lbfgs', \
+                     alpha=1e-5)
+clf_0.fit(X_train, y_train)
+\end{verbatim}
+and use it on the test data
+\begin{verbatim}
+y_pred = clf_0.predict(X_test)
+\end{verbatim}
+Finally, we check the quality of our prediction.
+\begin{verbatim}
+accuracy_score(y_test, y_pred)
+
+# Print the classification report.
+y_test_orig = encoder.inverse_transform(y_test)
+y_pred_orig = encoder.inverse_transform(y_pred)
+print(classification_report(y_test_orig, y_pred_orig, digits=2))
+
+# Print the confusion matrix.
+conf_mat = confusion_matrix(y_test_orig, y_pred_orig)
+ctypes = ['setosa ', 'versicolor', 'virginica']
+df_conf_mat = pd.DataFrame(conf_mat, index = ctypes, columns = ctypes)
+plt.figure(figsize = (10,7))
+ignore = sns.heatmap(df_conf_mat, annot=True, cmap='Blues', fmt='g')
+\end{verbatim}
 \bibliographystyle{plain}
 \bibliography{nn}
 \end{document}
